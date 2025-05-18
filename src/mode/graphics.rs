@@ -192,6 +192,17 @@ where
     pub async fn set_contrast(&mut self, contrast: u8) -> Result<(), DisplayError> {
         self.properties.set_contrast(contrast).await
     }
+
+    #[cfg(feature = "graphics")]
+    fn fill_solid_aligned(&mut self, x: u32, y: u32, width: u32, height: u32, fill: u8) {
+        let display_width = self.properties.get_dimensions().0 as u32;
+        // fill whole 8px tall chunks
+        for block in (y / 8)..((height + y) / 8) {
+            self.buffer[
+                (x + block * display_width) as usize..
+            ][..width as usize].fill(fill);
+        }
+    }
 }
 
 #[cfg(feature = "graphics")]
@@ -199,6 +210,8 @@ use embedded_graphics_core::{
     draw_target::DrawTarget,
     geometry::{Dimensions, OriginDimensions, Size},
     pixelcolor::BinaryColor,
+    prelude::Point,
+    primitives::Rectangle,
     Pixel,
 };
 
@@ -224,6 +237,38 @@ where
                 self.set_pixel(pos.x as u32, pos.y as u32, color.is_on().into())
             });
 
+        Ok(())
+    }
+
+    fn fill_solid(&mut self, area: &Rectangle, color: Self::Color) -> Result<(), Self::Error> {
+        let Rectangle { top_left: Point { x, y }, size: Size { width, height } } = area.intersection(&self.bounding_box());
+        // swap coordinates if rotated
+        let (x, y, width, height) = match self.properties.get_rotation() {
+            DisplayRotation::Rotate0 | DisplayRotation::Rotate180 => (x, y, width, height),
+            DisplayRotation::Rotate90 | DisplayRotation::Rotate270 => (y , x, height, width),
+        };
+        let fill = if color.is_on() { 0xff } else { 0 };
+
+        // 8-tall and aligned writes
+        if y % 8 == 0 && height % 8 == 0 {
+            self.fill_solid_aligned(x as u32, y as u32, width, height, fill);
+        } else if y / 8 - (y + height as i32) / 8 > 1 {
+            // perform a fast draw in solid fills that include a 8 row tall block
+            // slower fallback draw, top
+            let top_height = 8 - y % 8;
+            self.fill_solid(&Rectangle::new(Point::new(x, y), Size::new(width, top_height as u32)), color)?;
+            // slower fallback draw, bottom
+            let bottom_y = y + height as i32 - (y + height as i32) % 8;
+            let bottom_height = (y as u32 + height) % 8;
+            self.fill_solid(&Rectangle::new(Point::new(x, bottom_y), Size::new(width, bottom_height)), color)?;
+            // fast draw for the aligned block in the middle
+            let mid_block = (y / 8 + 1) as u32;
+            let mid_count = mid_block - (y as u32 + height) / 8 * 8;
+            self.fill_solid_aligned(x as u32, mid_block * 8, width, mid_count * 8, fill);
+        } else {
+            // no happy path :'(
+            self.fill_contiguous(area, core::iter::repeat(color))?;
+        }
         Ok(())
     }
 }
