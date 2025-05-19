@@ -31,6 +31,8 @@
 //! }
 //! ```
 
+use core::prelude::v1;
+
 use display_interface::{AsyncWriteOnlyDataCommand, DisplayError};
 use hal::{delay::DelayNs, digital::OutputPin};
 
@@ -194,14 +196,24 @@ where
     }
 
     #[cfg(feature = "graphics")]
+    /// Needs y to be a multiple of 8, excess height is ignored
     fn fill_solid_aligned(&mut self, x: u32, y: u32, width: u32, height: u32, fill: u8) {
-        let display_width = self.properties.get_dimensions().0 as u32;
         // fill whole 8px tall chunks
         for block in (y / 8)..((height + y) / 8) {
             self.buffer[
-                (x + block * display_width) as usize..
+                (x + block * DV::WIDTH as u32) as usize..
             ][..width as usize].fill(fill);
         }
+    }
+    #[cfg(feature = "graphics")]
+    fn apply_mask_to_page(&mut self, mask: u8, color: bool, page: u8, x: u8, width: u8) {
+        let col_offset = x as usize + page as usize * DV::WIDTH as usize;
+        let iter = self.buffer[col_offset..(col_offset + width as usize)].iter_mut();
+        if color {  
+            iter.for_each(|b| *b |= mask);
+        } else {
+            iter.for_each(|b| *b &= !mask);
+        };
     }
 }
 
@@ -243,13 +255,32 @@ where
     fn fill_solid(&mut self, area: &Rectangle, color: Self::Color) -> Result<(), Self::Error> {
         let Rectangle { top_left: Point { x, y }, size: Size { width, height } } = area.intersection(&self.bounding_box());
         // swap coordinates if rotated
-        let (x, y, width, height) = match self.properties.get_rotation() {
+        let (x, mut y, width, mut height) = match self.properties.get_rotation() {
             DisplayRotation::Rotate0 | DisplayRotation::Rotate180 => (x, y, width, height),
             DisplayRotation::Rotate90 | DisplayRotation::Rotate270 => (y , x, height, width),
         };
-        let fill = if color.is_on() { 0xff } else { 0 };
 
-        // 8-tall and aligned writes
+        // unaligned top
+        if y % 8 != 0 {
+            let mask_height = core::cmp::min(height, 8 - (y as u32 % 8));
+            let mask = ((1u8 << mask_height) - 1) << (y % 8);
+            self.apply_mask_to_page(mask, color.is_on(), (y / 8) as u8, x as u8, width as u8);
+
+            height -= mask_height;
+            y += mask_height as i32;
+        }
+        // potentially many full pages
+        if height != 0 {
+            let fill = if color.is_on() { 0xff } else { 0 };
+            self.fill_solid_aligned(x as u32, y as u32, width, height, fill);
+        }
+        if (height % 8) != 0 {
+            let mask = (1u8 << (height % 8)) - 1;
+            let page = (y as u8 + height as u8) / 8;
+            self.apply_mask_to_page(mask, color.is_on(), page, x as u8, width as u8);
+        }
+
+        let fill = if color.is_on() { 0xff } else { 0 };
         if y % 8 == 0 && height % 8 == 0 {
             self.fill_solid_aligned(x as u32, y as u32, width, height, fill);
         } else if y / 8 - (y + height as i32) / 8 > 1 {
