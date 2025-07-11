@@ -66,37 +66,32 @@ impl Command {
     where
         DI: AsyncWriteOnlyDataCommand,
     {
-        // Transform command into a fixed size array of 7 u8 and the real length for sending
+        // Transform command into a fixed size array of 2 u8 (seems to be the maximum) and the real length for sending
         let (data, len) = match self {
-            Command::AddressMode(mode) => ([0x20 | (mode as u8), 0, 0, 0, 0, 0, 0], 1),
-            Command::Contrast(val) => ([0x81, val, 0, 0, 0, 0, 0], 2),
-            Command::AllOn(on) => ([0xA4 | (on as u8), 0, 0, 0, 0, 0, 0], 1),
-            Command::Invert(inv) => ([0xA6 | (inv as u8), 0, 0, 0, 0, 0, 0], 1),
-            Command::DisplayResolution(resolution) => ([0xA9, resolution, 0, 0, 0, 0, 0], 2),
-            Command::DisplayOn(on) => ([0xAE | (on as u8), 0, 0, 0, 0, 0, 0], 1),
-            Command::ColumnAddressLow(addr) => ([0xF & addr, 0, 0, 0, 0, 0, 0], 1),
-            Command::ColumnAddressHigh(addr) => ([0x10 | (0xF & addr), 0, 0, 0, 0, 0, 0], 1),
-            Command::PageAddress(page) => ([0xB0 | (page), 0, 0, 0, 0, 0, 0], 1),
-            Command::LargePageAddress(page) => ([0xB0, page, 0, 0, 0, 0, 0], 2),
-            Command::StartLine(line) => ([0x40 | (0x3F & line), 0, 0, 0, 0, 0, 0], 1),
-            Command::SegmentRemap(remap) => ([0xA0 | (remap as u8), 0, 0, 0, 0, 0, 0], 1),
-            Command::Multiplex(ratio) => ([0xA8, ratio, 0, 0, 0, 0, 0], 2),
-            Command::ReverseComDir(rev) => ([0xC0 | ((rev as u8) << 3), 0, 0, 0, 0, 0, 0], 1),
-            Command::DisplayOffset(offset) => ([0xD3, offset, 0, 0, 0, 0, 0], 2),
-            Command::ComPinConfig(alt) => ([0xDA, 0x02 | ((alt as u8) << 4), 0, 0, 0, 0, 0], 2),
-            Command::DisplayClockDiv(fosc, div) => {
-                ([0xD5, ((0xF & fosc) << 4) | (0xF & div), 0, 0, 0, 0, 0], 2)
-            }
-            Command::PreChargePeriod(phase1, phase2) => (
-                [0xD9, ((0xF & phase2) << 4) | (0xF & phase1), 0, 0, 0, 0, 0],
-                2,
-            ),
-            Command::VcomhDeselect(level) => ([0xDB, (level as u8) << 4, 0, 0, 0, 0, 0], 2),
-            Command::Noop => ([0xE3, 0, 0, 0, 0, 0, 0], 1),
-            Command::ChargePump(en) => ([0xAD, 0x8A | (en as u8), 0, 0, 0, 0, 0], 2),
+            Command::AddressMode(mode) => ([0x20 | (mode as u8), 0], 1),
+            Command::Contrast(val) => ([0x81, val], 2),
+            Command::AllOn(on) => ([0xA4 | (on as u8), 0], 1),
+            Command::Invert(inv) => ([0xA6 | (inv as u8), 0], 1),
+            Command::DisplayResolution(resolution) => ([0xA9, resolution], 2),
+            Command::DisplayOn(on) => ([0xAE | (on as u8), 0], 1),
+            Command::ColumnAddressLow(addr) => ([0xF & addr, 0], 1),
+            Command::ColumnAddressHigh(addr) => ([0x10 | (0xF & addr), 0], 1),
+            Command::PageAddress(page) => ([0xB0 | (page), 0], 1),
+            Command::LargePageAddress(page) => ([0xB0, page], 2),
+            Command::StartLine(line) => ([0x40 | (0x3F & line), 0], 1),
+            Command::SegmentRemap(remap) => ([0xA0 | (remap as u8), 0], 1),
+            Command::Multiplex(ratio) => ([0xA8, ratio], 2),
+            Command::ReverseComDir(rev) => ([0xC0 | ((rev as u8) << 3), 0], 1),
+            Command::DisplayOffset(offset) => ([0xD3, offset], 2),
+            Command::ComPinConfig(alt) => ([0xDA, 0x02 | ((alt as u8) << 4)], 2),
+            Command::DisplayClockDiv(fosc, div) => ([0xD5, ((0xF & fosc) << 4) | (0xF & div)], 2),
+            Command::PreChargePeriod(phase1, phase2) => ([0xD9, ((0xF & phase2) << 4) | (0xF & phase1)], 2),
+            Command::VcomhDeselect(level) => ([0xDB, (level as u8) << 4], 2),
+            Command::Noop => ([0xE3, 0], 1),
+            Command::ChargePump(en) => ([0xAD, 0x8A | (en as u8)], 2),
         };
         // Send command over the interface
-        iface.send_commands(DataFormat::U8(&data[0..len])).await
+        iface.send_commands(DataFormat::U8(&data[..len])).await
     }
 }
 

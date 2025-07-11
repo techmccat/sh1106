@@ -5,7 +5,11 @@
 
 [![SH1107 SPI and I2C display modules showing the Rust logo](readme_banner.jpg?raw=true)](examples/image.rs)
 
-I2C and SPI driver for the SH11xx and SSD1xxx OLED displays written in 100% Rust
+I2C and SPI async driver for the SH11xx and SSD1xxx OLED displays written in 100% Rust. The library is designed to make it straigfotward to add new variants. Currently supported chips:
+
+- SH1107
+- SH1108
+- SSD1309
 
 ## [Documentation](https://docs.rs/oled_async)
 

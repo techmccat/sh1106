@@ -139,27 +139,16 @@ where
             return;
         }
 
-        let (byte, bit) = match display_rotation {
-            DisplayRotation::Rotate0 | DisplayRotation::Rotate180 => {
-                let byte =
-                    &mut self.buffer[((y as usize) / 8 * display_width as usize) + (x as usize)];
-                let bit = 1 << (y % 8);
-
-                (byte, bit)
-            }
-            DisplayRotation::Rotate90 | DisplayRotation::Rotate270 => {
-                let byte =
-                    &mut self.buffer[((x as usize) / 8 * display_width as usize) + (y as usize)];
-                let bit = 1 << (x % 8);
-
-                (byte, bit)
-            }
+        let bit_index = match display_rotation {
+            DisplayRotation::Rotate0 | DisplayRotation::Rotate180 => y % 8,
+            DisplayRotation::Rotate90 | DisplayRotation::Rotate270 => x % 8,
         };
+        let bit = 1 << bit_index;
 
         if value == 0 {
-            *byte &= !bit;
+            self.buffer[idx] &= !bit;
         } else {
-            *byte |= bit;
+            self.buffer[idx] |= bit;
         }
     }
 
