@@ -1,0 +1,11 @@
+[target.'cfg(all(target_arch = "arm", target_os = "none"))']
+#runner = "probe-run --chip STM32F103C8"
+runner = "probe-run --chip STM32G431CBUx"
+rustflags = [
+  "-C", "link-arg=-Tlink.x",
+# --- ADD following new flag ---
+  "-C", "link-arg=-Tdefmt.x",
+]
+
+[build]
+target = "thumbv7m-none-eabi"
