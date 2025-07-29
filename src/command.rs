@@ -1,4 +1,8 @@
-use display_interface::{AsyncWriteOnlyDataCommand, DataFormat, DisplayError};
+#[cfg(not(feature = "blocking"))]
+use display_interface::AsyncWriteOnlyDataCommand;
+#[cfg(feature = "blocking")]
+use display_interface::WriteOnlyDataCommand;
+use display_interface::{DataFormat, DisplayError};
 
 /// oled_async Commands
 
@@ -60,6 +64,14 @@ pub enum Command {
     ChargePump(bool),
 }
 
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl Command {
     /// Send command to oled_async
     pub async fn send<DI>(self, iface: &mut DI) -> Result<(), DisplayError>

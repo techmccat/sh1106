@@ -1,8 +1,20 @@
 //! Display variant
 
-use display_interface::{AsyncWriteOnlyDataCommand, DisplayError};
+#[cfg(not(feature = "blocking"))]
+use display_interface::AsyncWriteOnlyDataCommand;
+use display_interface::DisplayError;
+#[cfg(feature = "blocking")]
+use display_interface::WriteOnlyDataCommand;
 
 /// Trait to represent a speciffic display
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 pub trait DisplayVariant {
     /// Width of display
     const WIDTH: u8;

@@ -1,6 +1,9 @@
 //! Abstraction of different operating modes
 
+#[cfg(not(feature = "blocking"))]
 use display_interface::AsyncWriteOnlyDataCommand;
+#[cfg(feature = "blocking")]
+use display_interface::WriteOnlyDataCommand;
 
 use crate::properties::DisplayProperties;
 
@@ -16,6 +19,14 @@ pub trait DisplayModeTrait<DV, DI> {
     fn release(self) -> DisplayProperties<DV, DI>;
 }
 
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl<MODE> DisplayMode<MODE> {
     /// Setup display to run in requested mode
     pub fn new<DV, DI>(properties: DisplayProperties<DV, DI>) -> Self

@@ -38,8 +38,15 @@ use embedded_graphics::{
 use oled_async::{prelude::*, Builder};
 use {defmt_rtt as _, panic_probe as _};
 
-#[embassy_executor::main]
-async fn main(_spawner: Spawner) {
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
+async fn run() {
     let (di, mut reset, mut delay) = bsp::board::get_board();
 
     //type Display = oled_async::displays::sh1107::Sh1107_128_128;
@@ -101,4 +108,12 @@ async fn main(_spawner: Spawner) {
         }
         disp.flush().await.unwrap();
     }
+}
+
+#[embassy_executor::main]
+async fn main(_spawner: Spawner) {
+    #[cfg(not(feature = "blocking"))]
+    run().await;
+    #[cfg(feature = "blocking")]
+    run();
 }

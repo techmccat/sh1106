@@ -1,14 +1,34 @@
 //! SH1108 display variants and specifics
 
 use crate::display::DisplayVariant;
-use display_interface::{AsyncWriteOnlyDataCommand, DisplayError};
+#[cfg(not(feature = "blocking"))]
+use display_interface::AsyncWriteOnlyDataCommand;
+use display_interface::DisplayError;
+#[cfg(feature = "blocking")]
+use display_interface::WriteOnlyDataCommand;
 
 use crate::command::{Command, VcomhLevel};
 
 /// Generic 64x160 with SH1108 controller
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct Sh1108_64_160 {}
 
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl DisplayVariant for Sh1108_64_160 {
     const WIDTH: u8 = 64;
     const HEIGHT: u8 = 160;
@@ -31,9 +51,25 @@ impl DisplayVariant for Sh1108_64_160 {
 }
 
 /// Generic 96x160 with SH1108 controller
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct Sh1108_96_160 {}
 
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl DisplayVariant for Sh1108_96_160 {
     const WIDTH: u8 = 96;
     const HEIGHT: u8 = 160;
@@ -55,9 +91,25 @@ impl DisplayVariant for Sh1108_96_160 {
     }
 }
 /// Generic 128x160 with SH1108 controller
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct Sh1108_128_160 {}
 
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl DisplayVariant for Sh1108_128_160 {
     const WIDTH: u8 = 128;
     const HEIGHT: u8 = 160;
@@ -80,9 +132,25 @@ impl DisplayVariant for Sh1108_128_160 {
 }
 
 /// Generic 160x160 with SH1108 controller
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct Sh1108_160_160 {}
 
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl DisplayVariant for Sh1108_160_160 {
     const WIDTH: u8 = 160;
     const HEIGHT: u8 = 160;
@@ -106,6 +174,14 @@ impl DisplayVariant for Sh1108_160_160 {
 
 /// Initialise the display in column mode (i.e. a byte walks down a column of 8 pixels) with
 /// column 0 on the left and column _(display_width - 1)_ on the right.
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 pub async fn init_column_mode_common<DI>(
     iface: &mut DI,
     dimensions: (u8, u8),

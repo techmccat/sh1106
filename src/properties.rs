@@ -1,6 +1,11 @@
 //! Container to store and set display properties
 
-use display_interface::{AsyncWriteOnlyDataCommand, DataFormat, DisplayError};
+#[cfg(not(feature = "blocking"))]
+use display_interface::AsyncWriteOnlyDataCommand;
+#[cfg(feature = "blocking")]
+use display_interface::WriteOnlyDataCommand;
+
+use display_interface::{DataFormat, DisplayError};
 
 use crate::{command::Command, display::DisplayVariant, displayrotation::DisplayRotation};
 
@@ -15,6 +20,14 @@ pub struct DisplayProperties<DV, DI> {
     draw_row: u8,
 }
 
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl<DV, DI> DisplayProperties<DV, DI>
 where
     DI: AsyncWriteOnlyDataCommand,

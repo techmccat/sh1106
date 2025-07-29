@@ -31,9 +31,12 @@
 //! }
 //! ```
 
-use core::prelude::v1;
+#[cfg(not(feature = "blocking"))]
+use display_interface::AsyncWriteOnlyDataCommand;
+#[cfg(feature = "blocking")]
+use display_interface::WriteOnlyDataCommand;
 
-use display_interface::{AsyncWriteOnlyDataCommand, DisplayError};
+use display_interface::DisplayError;
 use hal::{delay::DelayNs, digital::OutputPin};
 
 use crate::{
@@ -44,6 +47,14 @@ use crate::{
 const DEFAULT_BUFFER_SIZE: usize = 160 * 160 / 8;
 
 /// Graphics mode handler
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 pub struct GraphicsMode<DV, DI, const BS: usize = DEFAULT_BUFFER_SIZE>
 where
     DI: AsyncWriteOnlyDataCommand,
@@ -53,6 +64,14 @@ where
     buffer: [u8; BS],
 }
 
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl<DV, DI, const BS: usize> DisplayModeTrait<DV, DI> for GraphicsMode<DV, DI, BS>
 where
     DI: AsyncWriteOnlyDataCommand,
@@ -72,6 +91,14 @@ where
     }
 }
 
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl<DV, DI, const BS: usize> GraphicsMode<DV, DI, BS>
 where
     DI: AsyncWriteOnlyDataCommand,
@@ -217,6 +244,14 @@ use embedded_graphics_core::{
 };
 
 #[cfg(feature = "graphics")]
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl<DV, DI, const BS: usize> DrawTarget for GraphicsMode<DV, DI, BS>
 where
     DI: AsyncWriteOnlyDataCommand,
@@ -294,6 +329,14 @@ where
 }
 
 #[cfg(feature = "graphics")]
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl<DV, DI, const BS: usize> OriginDimensions for GraphicsMode<DV, DI, BS>
 where
     DI: AsyncWriteOnlyDataCommand,

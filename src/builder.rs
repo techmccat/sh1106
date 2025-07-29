@@ -35,7 +35,11 @@
 //! let mut display: GraphicsMode<_, _> = raw_display.into();
 //! ```
 
+#[cfg(not(feature = "blocking"))]
 use display_interface::AsyncWriteOnlyDataCommand;
+#[cfg(feature = "blocking")]
+use display_interface::WriteOnlyDataCommand;
+
 use hal::digital::OutputPin;
 
 use crate::{
@@ -47,6 +51,14 @@ use crate::{
 /// Builder struct. Driver options and interface are set using its methods.
 ///
 /// See the [module level documentation](crate::builder) for more details.
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 #[derive(Clone, Copy)]
 pub struct Builder<DV> {
     variant: DV,
@@ -63,6 +75,14 @@ impl<DV> Builder<DV> {
     }
 }
 
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl<DV> Builder<DV> {
     /// Set the rotation of the display to one of four values. Defaults to no rotation.
     pub fn with_rotation(self, rotation: DisplayRotation) -> Self {

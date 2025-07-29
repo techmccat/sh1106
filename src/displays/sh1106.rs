@@ -1,12 +1,32 @@
 //! SH1106 display variant
 
 use crate::{display::DisplayVariant, command::Command};
-use display_interface::{AsyncWriteOnlyDataCommand, DisplayError};
+use display_interface::DisplayError;
+#[cfg(not(feature = "blocking"))]
+use display_interface::AsyncWriteOnlyDataCommand;
+#[cfg(feature = "blocking")]
+use display_interface::WriteOnlyDataCommand;
 
 /// Generic 128x64 with SH1106 controller
 #[derive(Debug, Clone, Copy)]
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 pub struct Sh1106_128_64 {}
 
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl DisplayVariant for Sh1106_128_64 {
     const WIDTH: u8 = 128;
     const HEIGHT: u8 = 64;

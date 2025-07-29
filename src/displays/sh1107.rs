@@ -1,14 +1,34 @@
 //! SH1107 display variants and specifics
 
 use crate::display::DisplayVariant;
-use display_interface::{AsyncWriteOnlyDataCommand, DisplayError};
+#[cfg(not(feature = "blocking"))]
+use display_interface::AsyncWriteOnlyDataCommand;
+use display_interface::DisplayError;
+#[cfg(feature = "blocking")]
+use display_interface::WriteOnlyDataCommand;
 
 use crate::command::{Command, VcomhLevel};
 
 /// Generic 64x128 with SH1107 controller
 #[derive(Debug, Clone, Copy)]
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 pub struct Sh1107_64_128 {}
 
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl DisplayVariant for Sh1107_64_128 {
     const WIDTH: u8 = 64;
     const HEIGHT: u8 = 128;
@@ -29,9 +49,25 @@ impl DisplayVariant for Sh1107_64_128 {
 }
 
 /// Generic 128x128 with SH1107 controller
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct Sh1107_128_128 {}
 
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl DisplayVariant for Sh1107_128_128 {
     const WIDTH: u8 = 128;
     const HEIGHT: u8 = 128;
@@ -53,6 +89,14 @@ impl DisplayVariant for Sh1107_128_128 {
 
 /// Initialise the display in column mode (i.e. a byte walks down a column of 8 pixels) with
 /// column 0 on the left and column _(display_width - 1)_ on the right.
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 pub async fn init_column_mode_common<DI>(
     iface: &mut DI,
     dimensions: (u8, u8),

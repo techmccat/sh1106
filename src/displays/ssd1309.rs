@@ -1,14 +1,34 @@
 //! SSD1309 display variants and specifics
 
 use crate::display::DisplayVariant;
-use display_interface::{AsyncWriteOnlyDataCommand, DisplayError};
+#[cfg(not(feature = "blocking"))]
+use display_interface::AsyncWriteOnlyDataCommand;
+use display_interface::DisplayError;
+#[cfg(feature = "blocking")]
+use display_interface::WriteOnlyDataCommand;
 
 use crate::command::{Command, VcomhLevel};
 
 /// Generic 128x128 with SSD1309 controller
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 #[derive(Debug, Clone, Copy)]
 pub struct Ssd1309_128_64 {}
 
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 impl DisplayVariant for Ssd1309_128_64 {
     const WIDTH: u8 = 128;
     const HEIGHT: u8 = 64;
@@ -30,6 +50,14 @@ impl DisplayVariant for Ssd1309_128_64 {
 
 /// Initialise the display in column mode (i.e. a byte walks down a column of 8 pixels) with
 /// column 0 on the left and column _(display_width - 1)_ on the right.
+#[maybe_async_cfg::maybe(
+    sync(
+        feature = "blocking",
+        keep_self,
+        idents(AsyncWriteOnlyDataCommand(sync = "WriteOnlyDataCommand"),)
+    ),
+    async(not(feature = "blocking"), keep_self)
+)]
 pub async fn init_column_mode_common<DI>(
     iface: &mut DI,
     dimensions: (u8, u8),
