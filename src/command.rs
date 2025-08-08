@@ -88,7 +88,7 @@ impl Command {
             Command::DisplayOn(on) => ([0xAE | (on as u8), 0], 1),
             Command::ColumnAddressLow(addr) => ([0xF & addr, 0], 1),
             Command::ColumnAddressHigh(addr) => ([0x10 | (0xF & addr), 0], 1),
-            Command::PageAddress(page) => ([0xB0 | (page), 0], 1),
+            Command::PageAddress(page) => ([0xB0 | (page & 0xF), 0], 1),
             Command::LargePageAddress(page) => ([0xB0, page], 2),
             Command::StartLine(line) => ([0x40 | (0x3F & line), 0], 1),
             Command::SegmentRemap(remap) => ([0xA0 | (remap as u8), 0], 1),

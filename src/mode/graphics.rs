@@ -62,6 +62,8 @@ where
 {
     properties: DisplayProperties<DV, DI>,
     buffer: [u8; BS],
+    top_left: (u8, u8),
+    bot_right: (u8, u8),
 }
 
 #[maybe_async_cfg::maybe(
@@ -82,6 +84,8 @@ where
         GraphicsMode {
             properties,
             buffer: [0u8; BS],
+            top_left: (DV::WIDTH, DV::HEIGHT),
+            bot_right: (0, 0),
         }
     }
 
@@ -107,6 +111,8 @@ where
     /// Clear the display buffer. You need to call `display.flush()` for any effect on the screen
     pub fn clear(&mut self) {
         self.buffer = [0; BS];
+        self.top_left = (0, 0);
+        self.bot_right = (DV::WIDTH - 1, DV::HEIGHT - 1);
     }
 
     /// Reset display
@@ -124,20 +130,37 @@ where
 
     /// Write out data to display
     pub async fn flush(&mut self) -> Result<(), DisplayError> {
-        // Ensure the display buffer is at the origin of the display before we send the full frame
-        // to prevent accidental offsets
-        let (display_width, display_height) = DV::dimensions();
-        let column_offset = DV::COLUMN_OFFSET;
-        self.properties
-            .set_draw_area(
-                (column_offset, 0),
-                (display_width + column_offset, display_height),
-            )
-            .await?;
+        // nothing drawn since last flush
+        if self.top_left.0 > self.bot_right.0 || self.top_left.1 > self.bot_right.1 {
+            return Ok(());
+        }
 
-        let length = (display_width as usize) * (display_height as usize) / 8;
+        let base_col = self.top_left.0;
+        let end_col = self.bot_right.0;
 
-        self.properties.draw(&self.buffer[..length]).await
+        let base_page = self.top_left.1 / 8;
+        let end_page = self.bot_right.1.div_ceil(8);
+
+        // for each page in the modified area
+        for (page_num, buf) in self
+            .buffer
+            .chunks_exact(DV::WIDTH as usize)
+            .enumerate()
+            .skip(base_page as usize)
+            .take((end_page - base_page) as usize)
+        {
+            // crop to columns in the modified area
+            let buf = &buf[(base_col as usize)..=(end_col as usize)];
+            // column offsetting done in draw_page
+            self.properties
+                .draw_page(page_num as u8, base_col, buf)
+                .await?;
+        }
+
+        self.top_left = (DV::WIDTH - 1, DV::HEIGHT);
+        self.bot_right = (0, 0);
+
+        Ok(())
     }
 
     /// Turn a pixel on or off. A non-zero `value` is treated as on, `0` as off. If the X and Y
@@ -146,30 +169,22 @@ where
         let (display_width, _) = DV::dimensions();
         let display_rotation = self.properties.get_rotation();
 
-        let idx = match display_rotation {
-            DisplayRotation::Rotate0 | DisplayRotation::Rotate180 => {
-                if x >= display_width as u32 {
-                    return;
-                }
-                ((y as usize) / 8 * display_width as usize) + (x as usize)
-            }
-
-            DisplayRotation::Rotate90 | DisplayRotation::Rotate270 => {
-                if y >= display_width as u32 {
-                    return;
-                }
-                ((x as usize) / 8 * display_width as usize) + (y as usize)
-            }
+        let (x, y) = match display_rotation {
+            DisplayRotation::Rotate0 | DisplayRotation::Rotate180 => (x, y),
+            DisplayRotation::Rotate90 | DisplayRotation::Rotate270 => (y, x),
         };
+        self.top_left.0 = self.top_left.0.min(x as u8);
+        self.top_left.1 = self.top_left.1.min(y as u8);
+
+        self.bot_right.0 = self.bot_right.0.max(x as u8);
+        self.bot_right.1 = self.bot_right.1.max(y as u8);
+
+        let idx = (y as usize / 8) * display_width as usize + x as usize;
 
         if idx >= self.buffer.len() {
             return;
         }
-
-        let bit_index = match display_rotation {
-            DisplayRotation::Rotate0 | DisplayRotation::Rotate180 => y % 8,
-            DisplayRotation::Rotate90 | DisplayRotation::Rotate270 => x % 8,
-        };
+        let bit_index = y % 8;
         let bit = 1 << bit_index;
 
         if value == 0 {
@@ -216,16 +231,14 @@ where
     fn fill_solid_aligned(&mut self, x: u32, y: u32, width: u32, height: u32, fill: u8) {
         // fill whole 8px tall chunks
         for block in (y / 8)..((height + y) / 8) {
-            self.buffer[
-                (x + block * DV::WIDTH as u32) as usize..
-            ][..width as usize].fill(fill);
+            self.buffer[(x + block * DV::WIDTH as u32) as usize..][..width as usize].fill(fill);
         }
     }
     #[cfg(feature = "graphics")]
     fn apply_mask_to_page(&mut self, mask: u8, color: bool, page: u8, x: u8, width: u8) {
         let col_offset = x as usize + page as usize * DV::WIDTH as usize;
         let iter = self.buffer[col_offset..(col_offset + width as usize)].iter_mut();
-        if color {  
+        if color {
             iter.for_each(|b| *b |= mask);
         } else {
             iter.for_each(|b| *b &= !mask);
@@ -277,12 +290,20 @@ where
     }
 
     fn fill_solid(&mut self, area: &Rectangle, color: Self::Color) -> Result<(), Self::Error> {
-        let Rectangle { top_left: Point { x, y }, size: Size { width, height } } = area.intersection(&self.bounding_box());
+        let Rectangle {
+            top_left: Point { x, y },
+            size: Size { width, height },
+        } = area.intersection(&self.bounding_box());
         // swap coordinates if rotated
         let (x, mut y, width, mut height) = match self.properties.get_rotation() {
             DisplayRotation::Rotate0 | DisplayRotation::Rotate180 => (x, y, width, height),
-            DisplayRotation::Rotate90 | DisplayRotation::Rotate270 => (y , x, height, width),
+            DisplayRotation::Rotate90 | DisplayRotation::Rotate270 => (y, x, height, width),
         };
+        self.top_left.0 = self.top_left.0.min(x as u8);
+        self.top_left.1 = self.top_left.1.min(y as u8);
+
+        self.bot_right.0 = self.bot_right.0.max(x as u8 + width as u8);
+        self.bot_right.1 = self.bot_right.1.max(y as u8 + height as u8);
 
         // unaligned top
         if y % 8 != 0 {
@@ -311,11 +332,17 @@ where
             // perform a fast draw in solid fills that include a 8 row tall block
             // slower fallback draw, top
             let top_height = 8 - y % 8;
-            self.fill_solid(&Rectangle::new(Point::new(x, y), Size::new(width, top_height as u32)), color)?;
+            self.fill_solid(
+                &Rectangle::new(Point::new(x, y), Size::new(width, top_height as u32)),
+                color,
+            )?;
             // slower fallback draw, bottom
             let bottom_y = y + height as i32 - (y + height as i32) % 8;
             let bottom_height = (y as u32 + height) % 8;
-            self.fill_solid(&Rectangle::new(Point::new(x, bottom_y), Size::new(width, bottom_height)), color)?;
+            self.fill_solid(
+                &Rectangle::new(Point::new(x, bottom_y), Size::new(width, bottom_height)),
+                color,
+            )?;
             // fast draw for the aligned block in the middle
             let mid_block = (y / 8 + 1) as u32;
             let mid_count = mid_block - (y as u32 + height) / 8 * 8;
