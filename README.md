@@ -1,4 +1,4 @@
-# SH1106 driver
+# Monochrome oled driver
 
 [![Crates.io](https://img.shields.io/crates/v/oled_async.svg)](https://crates.io/crates/oled_async)
 [![Docs.rs](https://docs.rs/sh1106/badge.svg)](https://docs.rs/oled_async)
@@ -7,6 +7,7 @@
 
 I2C and SPI async driver for the SH11xx and SSD1xxx OLED displays written in 100% Rust. The library is designed to make it straigfotward to add new variants. Currently supported chips:
 
+- SH1106
 - SH1107
 - SH1108
 - SSD1309
