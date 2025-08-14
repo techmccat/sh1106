@@ -302,13 +302,13 @@ where
         self.top_left.0 = self.top_left.0.min(x as u8);
         self.top_left.1 = self.top_left.1.min(y as u8);
 
-        self.bot_right.0 = self.bot_right.0.max(x as u8 + width as u8);
-        self.bot_right.1 = self.bot_right.1.max(y as u8 + height as u8);
+        self.bot_right.0 = self.bot_right.0.max(x as u8 + width as u8 - 1);
+        self.bot_right.1 = self.bot_right.1.max(y as u8 + height as u8 - 1);
 
         // unaligned top
         if y % 8 != 0 {
             let mask_height = core::cmp::min(height, 8 - (y as u32 % 8));
-            let mask = ((1u8 << mask_height) - 1) << (y % 8);
+            let mask = ((1u8 << mask_height).wrapping_sub(1)) << (y % 8);
             self.apply_mask_to_page(mask, color.is_on(), (y / 8) as u8, x as u8, width as u8);
 
             height -= mask_height;
@@ -325,32 +325,6 @@ where
             self.apply_mask_to_page(mask, color.is_on(), page, x as u8, width as u8);
         }
 
-        let fill = if color.is_on() { 0xff } else { 0 };
-        if y % 8 == 0 && height % 8 == 0 {
-            self.fill_solid_aligned(x as u32, y as u32, width, height, fill);
-        } else if y / 8 - (y + height as i32) / 8 > 1 {
-            // perform a fast draw in solid fills that include a 8 row tall block
-            // slower fallback draw, top
-            let top_height = 8 - y % 8;
-            self.fill_solid(
-                &Rectangle::new(Point::new(x, y), Size::new(width, top_height as u32)),
-                color,
-            )?;
-            // slower fallback draw, bottom
-            let bottom_y = y + height as i32 - (y + height as i32) % 8;
-            let bottom_height = (y as u32 + height) % 8;
-            self.fill_solid(
-                &Rectangle::new(Point::new(x, bottom_y), Size::new(width, bottom_height)),
-                color,
-            )?;
-            // fast draw for the aligned block in the middle
-            let mid_block = (y / 8 + 1) as u32;
-            let mid_count = mid_block - (y as u32 + height) / 8 * 8;
-            self.fill_solid_aligned(x as u32, mid_block * 8, width, mid_count * 8, fill);
-        } else {
-            // no happy path :'(
-            self.fill_contiguous(area, core::iter::repeat(color))?;
-        }
         Ok(())
     }
 }
