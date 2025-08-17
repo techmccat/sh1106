@@ -6,5 +6,6 @@
 pub mod displaymode;
 pub mod graphics;
 pub mod raw;
+pub mod tiled;
 
 pub use self::{graphics::GraphicsMode, raw::RawMode};
