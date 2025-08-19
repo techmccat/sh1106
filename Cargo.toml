@@ -19,7 +19,7 @@ targets = [ "thumbv7m-none-eabi", "thumbv7em-none-eabihf" ]
 defmt = "0.3"
 embedded-hal = "1.0.0"
 embedded-graphics-core = { version = "0.4", optional = true }
-display-interface = "^ 0.5"
+display-interface = { version = "^ 0.5", features = ["defmt-03"] }
 maybe-async-cfg = "0.2.3"
 
 [dev-dependencies]
