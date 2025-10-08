@@ -18,7 +18,7 @@ use embedded_graphics_core::{pixelcolor::BinaryColor, prelude::*, primitives::Re
 /// LSB is at the top of the column
 /// Width must fit inside a u8, it's a usize for now
 /// because generic const exprs aren't done yet
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Page<const W: usize>(pub [u8; W]);
 
 /// Operations to perform on a buffered pixel
@@ -45,11 +45,11 @@ impl From<BinaryColor> for PixelOperation {
 
 impl<const W: usize> Page<W> {
     /// Creates a new page with the provided pixel pattern
-    pub fn new(pattern: u8) -> Self {
+    pub const fn new(pattern: u8) -> Self {
         Self([pattern; W])
     }
     /// Applies the provided operation to a single pixel
-    pub fn modify_pixel(&mut self, x: u8, y: u8, op: PixelOperation) {
+    pub const fn modify_pixel(&mut self, x: u8, y: u8, op: PixelOperation) {
         if x < W as u8 {
             let mask = 1 << (y % 8);
             let cell = &mut self.0[x as usize];
@@ -67,7 +67,7 @@ impl<const W: usize> Page<W> {
             return;
         }
         let start = W.min(start as usize);
-        let end = W.max(end as usize);
+        let end = W.min(end as usize);
         for cell in self.0[start..end].iter_mut() {
             match op {
                 PixelOperation::Set => *cell |= mask,
@@ -90,12 +90,20 @@ pub struct Tile<const W: usize, const P: usize> {
 }
 
 impl<const W: usize, const P: usize> Tile<W, P> {
+    /// Creates a new tile, with pixels filled with the provided pattern
+    pub const fn new(col_offset: u8, page_offset: u8, pattern: u8) -> Self {
+        Self {
+            pages: [Page::new(pattern); P],
+            col_offset,
+            page_offset,
+        }
+    }
     /// sets pixel relative to this tile's base position
     pub fn modify_pixel(&mut self, x: u8, y: u8, op: PixelOperation) {
         if x < W as u8 {
-            self.pages
-                .get_mut(y as usize / 8)
-                .map(|page| page.modify_pixel(x, y % 8, op));
+            if let Some(page) = self.pages.get_mut(y as usize / 8) {
+                page.modify_pixel(x, y % 8, op)
+            }
         }
     }
 }
@@ -268,6 +276,11 @@ where
     DI: AsyncWriteOnlyDataCommand,
     DV: display::DisplayVariant,
 {
+    /// Initializes the display in column mode
+    pub async fn init(&mut self) -> Result<(), DisplayError> {
+        self.properties.init_column_mode().await
+    }
+
     /// Draws a page to the screen, at the provided address and column offset
     pub async fn draw_page<const W: usize>(
         &mut self,
