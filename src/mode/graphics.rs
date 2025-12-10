@@ -58,13 +58,13 @@ const DEFAULT_BUFFER_SIZE: usize = 160 * 160 / 8;
     ),
     async(not(feature = "blocking"), keep_self)
 )]
-pub struct GraphicsMode<DV, DI, const BS: usize = DEFAULT_BUFFER_SIZE>
+pub struct GraphicsMode<'buf, DV, DI, const BS: usize = DEFAULT_BUFFER_SIZE>
 where
     DI: AsyncWriteOnlyDataCommand,
     DV: display::DisplayVariant,
 {
     properties: DisplayProperties<DV, DI>,
-    buffer: [u8; BS],
+    buffer: Option<&'buf mut [u8; BS]>,
     top_left: (u8, u8),
     bot_right: (u8, u8),
 }
@@ -77,7 +77,7 @@ where
     ),
     async(not(feature = "blocking"), keep_self)
 )]
-impl<DV, DI, const BS: usize> DisplayModeTrait<DV, DI> for GraphicsMode<DV, DI, BS>
+impl<DV, DI, const BS: usize> DisplayModeTrait<DV, DI> for GraphicsMode<'_, DV, DI, BS>
 where
     DI: AsyncWriteOnlyDataCommand,
     DV: display::DisplayVariant,
@@ -86,7 +86,7 @@ where
     fn new(properties: DisplayProperties<DV, DI>) -> Self {
         GraphicsMode {
             properties,
-            buffer: [0u8; BS],
+            buffer: None,
             top_left: (DV::WIDTH, DV::HEIGHT),
             bot_right: (0, 0),
         }
@@ -106,14 +106,21 @@ where
     ),
     async(not(feature = "blocking"), keep_self)
 )]
-impl<DV, DI, const BS: usize> GraphicsMode<DV, DI, BS>
+impl<'buf, DV, DI, const BS: usize> GraphicsMode<'buf, DV, DI, BS>
 where
     DI: AsyncWriteOnlyDataCommand,
     DV: display::DisplayVariant,
 {
+    /// Returns self with a populated buffer
+    ///
+    /// Must be called, else draws will be a no-op
+    pub fn with_buffer(mut self, buf: &'buf mut [u8; BS]) -> Self {
+        self.buffer = Some(buf);
+        self
+    }
     /// Clear the display buffer. You need to call `display.flush()` for any effect on the screen
     pub fn clear(&mut self) {
-        self.buffer = [0; BS];
+        if let Some(b) = &mut self.buffer { b.fill(0) };
         self.top_left = (0, 0);
         self.bot_right = (DV::WIDTH - 1, DV::HEIGHT - 1);
     }
@@ -133,6 +140,7 @@ where
 
     /// Write out data to display
     pub async fn flush(&mut self) -> Result<(), DisplayError> {
+        let Some(ref buffer) = self.buffer else { return Ok(()) };
         // nothing drawn since last flush
         if self.top_left.0 > self.bot_right.0 || self.top_left.1 > self.bot_right.1 {
             return Ok(());
@@ -145,8 +153,7 @@ where
         let end_page = self.bot_right.1.div_ceil(8);
 
         // for each page in the modified area
-        for (page_num, buf) in self
-            .buffer
+        for (page_num, buf) in buffer
             .chunks_exact(DV::WIDTH as usize)
             .enumerate()
             .skip(base_page as usize)
@@ -169,6 +176,7 @@ where
     /// Turn a pixel on or off. A non-zero `value` is treated as on, `0` as off. If the X and Y
     /// coordinates are out of the bounds of the display, this method call is a noop.
     pub fn set_pixel(&mut self, x: u32, y: u32, value: u8) {
+        let Some(ref mut buffer) = self.buffer else { return };
         let (display_width, _) = DV::dimensions();
         let display_rotation = self.properties.get_rotation();
 
@@ -184,16 +192,16 @@ where
 
         let idx = (y as usize / 8) * display_width as usize + x as usize;
 
-        if idx >= self.buffer.len() {
+        if idx >= buffer.len() {
             return;
         }
         let bit_index = y % 8;
         let bit = 1 << bit_index;
 
         if value == 0 {
-            self.buffer[idx] &= !bit;
+            buffer[idx] &= !bit;
         } else {
-            self.buffer[idx] |= bit;
+            buffer[idx] |= bit;
         }
     }
 
@@ -232,15 +240,17 @@ where
     #[cfg(feature = "graphics")]
     /// Needs y to be a multiple of 8, excess height is ignored
     fn fill_solid_aligned(&mut self, x: u32, y: u32, width: u32, height: u32, fill: u8) {
+        let Some(ref mut buffer) = self.buffer else { return };
         // fill whole 8px tall chunks
         for block in (y / 8)..((height + y) / 8) {
-            self.buffer[(x + block * DV::WIDTH as u32) as usize..][..width as usize].fill(fill);
+            buffer[(x + block * DV::WIDTH as u32) as usize..][..width as usize].fill(fill);
         }
     }
     #[cfg(feature = "graphics")]
     fn apply_mask_to_page(&mut self, mask: u8, color: bool, page: u8, x: u8, width: u8) {
+        let Some(ref mut buffer) = self.buffer else { return };
         let col_offset = x as usize + page as usize * DV::WIDTH as usize;
-        let iter = self.buffer[col_offset..(col_offset + width as usize)].iter_mut();
+        let iter = buffer[col_offset..(col_offset + width as usize)].iter_mut();
         if color {
             iter.for_each(|b| *b |= mask);
         } else {
@@ -268,7 +278,7 @@ use embedded_graphics_core::{
     ),
     async(not(feature = "blocking"), keep_self)
 )]
-impl<DV, DI, const BS: usize> DrawTarget for GraphicsMode<DV, DI, BS>
+impl<DV, DI, const BS: usize> DrawTarget for GraphicsMode<'_, DV, DI, BS>
 where
     DI: AsyncWriteOnlyDataCommand,
     DV: display::DisplayVariant,
@@ -343,7 +353,7 @@ where
     ),
     async(not(feature = "blocking"), keep_self)
 )]
-impl<DV, DI, const BS: usize> OriginDimensions for GraphicsMode<DV, DI, BS>
+impl<DV, DI, const BS: usize> OriginDimensions for GraphicsMode<'_, DV, DI, BS>
 where
     DI: AsyncWriteOnlyDataCommand,
     DV: display::DisplayVariant,
