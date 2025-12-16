@@ -9,10 +9,13 @@
 //!     text::{Baseline, Text},
 //! };
 //! async fn run_display(display_interface: SomeInstanceOfDisplayInterface) {
+//!     // example size for 128x64 screens
+//!     let mut buffer = [0u8; 1024];
 //!     let mut disp: GraphicsMode<_, _> = Builder::new(Display {})
 //!         .with_rotation(crate::DisplayRotation::Rotate180)
 //!         .connect(display_interface)
-//!         .into();
+//!         .into()
+//!         .with_buffer(&mut buf);
 //!
 //!     disp.reset(&mut reset, &mut delay).unwrap();
 //!     disp.init().await.unwrap();
