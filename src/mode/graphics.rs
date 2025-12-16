@@ -290,10 +290,12 @@ where
     }
 
     fn fill_solid(&mut self, area: &Rectangle, color: Self::Color) -> Result<(), Self::Error> {
+        let intersect = area.intersection(&self.bounding_box());
+        if intersect.is_zero_sized() { return Ok(()) };
         let Rectangle {
             top_left: Point { x, y },
             size: Size { width, height },
-        } = area.intersection(&self.bounding_box());
+        } = intersect;
         // swap coordinates if rotated
         let (x, mut y, width, mut height) = match self.properties.get_rotation() {
             DisplayRotation::Rotate0 | DisplayRotation::Rotate180 => (x, y, width, height),
