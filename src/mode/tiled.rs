@@ -236,7 +236,8 @@ where
     DI: AsyncWriteOnlyDataCommand,
     DV: display::DisplayVariant,
 {
-    properties: DisplayProperties<DV, DI>,
+    /// Raw internal display
+    pub properties: DisplayProperties<DV, DI>,
 }
 
 #[maybe_async_cfg::maybe(
