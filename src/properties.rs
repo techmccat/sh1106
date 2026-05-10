@@ -16,6 +16,8 @@ pub struct DisplayProperties<DV, DI> {
     display_rotation: DisplayRotation,
     draw_area_start: (u8, u8),
     draw_area_end: (u8, u8),
+    panel_on: bool,
+    pump_on: bool,
 }
 
 #[maybe_async_cfg::maybe(
@@ -43,6 +45,8 @@ where
             display_rotation,
             draw_area_start: (0, 0),
             draw_area_end: (0, 0),
+            panel_on: true,
+            pump_on: true,
         }
     }
 
@@ -57,14 +61,10 @@ where
     }
 
     /// Set the position in the framebuffer of the display where any sent data should be
-    /// drawn. 
+    /// drawn.
     ///
     /// This method can be used for changing the affected area on the screen
-    pub fn set_draw_area(
-        &mut self,
-        start: (u8, u8),
-        end: (u8, u8),
-    ) {
+    pub fn set_draw_area(&mut self, start: (u8, u8), end: (u8, u8)) {
         self.draw_area_start = start;
         self.draw_area_end = end;
     }
@@ -161,7 +161,37 @@ where
     /// Turn the display on or off. The display can be drawn to and retains all
     /// of its memory even while off.
     pub async fn display_on(&mut self, on: bool) -> Result<(), DisplayError> {
-        Command::DisplayOn(on).send(&mut self.iface).await
+        if on != self.panel_on {
+            Command::DisplayOn(on).send(&mut self.iface).await?;
+            self.panel_on = on;
+        }
+        Ok(())
+    }
+
+    /// Turn the charge pump on or off.
+    ///
+    /// This function manages turning the panel off before sending the command,
+    /// optionally restoring the previous panel state if keep_display is true
+    pub async fn charge_pump_on(
+        &mut self,
+        on: bool,
+        keep_display: bool,
+    ) -> Result<(), DisplayError> {
+        let was_on = self.panel_on;
+        if self.panel_on {
+            Command::DisplayOn(false).send(&mut self.iface).await?;
+            self.panel_on = false;
+        }
+
+        Command::ChargePump(on).send(&mut self.iface).await?;
+        self.pump_on = on;
+
+        if was_on && keep_display {
+            Command::DisplayOn(true).send(&mut self.iface).await?;
+        } else {
+            self.panel_on = true;
+        }
+        Ok(())
     }
 
     /// Set the display contrast
